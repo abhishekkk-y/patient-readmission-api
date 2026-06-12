@@ -41,8 +41,9 @@ train.py ──► XGBoost model ──► MLflow tracking & model registry
       ▼
 FastAPI app (app/main.py)
       │
-      ├─► /health    – service health check
-      └─► /predict   – returns readmission risk score
+      ├─► /health         – service health check
+      ├─► /predict        – single-patient risk score
+      └─► /predict_batch  – risk scores for multiple patients
                 │
                 ▼
         Predictions logged to SQLite
@@ -52,6 +53,9 @@ FastAPI app (app/main.py)
       │
       ▼
 Docker container ──► deployed on Render (free tier)
+      │
+      ▼
+Streamlit app ──► UI for single predictions & CSV batch scoring
 ```
 
 ---
@@ -67,6 +71,7 @@ Docker container ──► deployed on Render (free tier)
 | Deployment         | Render (free tier, Docker runtime)    |
 | Monitoring         | Evidently AI + SQLite prediction logs |
 | Testing            | Pytest                                |
+| Front end          | Streamlit                             |
 
 ---
 
@@ -121,6 +126,18 @@ docker build -t patient-readmission-api .
 docker run -p 8000:8000 patient-readmission-api
 ```
 
+### Running the Streamlit app
+
+The Streamlit app provides a UI on top of the deployed API — a form for
+single-patient predictions, and a CSV upload tab for batch scoring.
+
+```bash
+streamlit run streamlit_app/app.py
+```
+
+This opens at `http://localhost:8501` and calls the live Render API under
+the hood, so no local model loading is required.
+
 ---
 
 ## Project Structure
@@ -133,6 +150,8 @@ patient-readmission-api/
 │   ├── preprocess.py
 │   └── train.py
 ├── monitoring/         # Evidently AI drift reports
+├── streamlit_app/      # Streamlit front end (single + batch predictions)
+│   └── app.py
 ├── tests/              # Pytest test suite
 ├── mlruns/             # MLflow experiment artifacts
 ├── mlflow.db           # MLflow tracking & model registry database
@@ -189,6 +208,53 @@ Example response:
   "model_version": "readmission-model@champion"
 }
 ```
+
+### Batch prediction
+```
+POST /predict_batch
+```
+
+Accepts a JSON array of patient objects (same schema as `/predict`) and
+returns a list of predictions in the same order — useful for scoring many
+patients (e.g., from a CSV) in a single request.
+
+Example request body:
+```json
+[
+  { "race": "Caucasian", "gender": "Female", "age": "[50-60)", "time_in_hospital": 3, ... },
+  { "race": "AfricanAmerican", "gender": "Male", "age": "[70-80)", "time_in_hospital": 10, ... }
+]
+```
+
+Example response:
+```json
+[
+  {
+    "readmission_risk_score": 0.3241,
+    "risk_level": "Medium",
+    "prediction": "Unlikely readmission within 30 days"
+  },
+  {
+    "readmission_risk_score": 0.5872,
+    "risk_level": "High",
+    "prediction": "Likely readmission within 30 days"
+  }
+]
+```
+
+---
+
+## Streamlit App
+
+A small Streamlit front end sits on top of the API and provides two modes:
+
+- **Single Patient** — a form for entering one patient's details, returning
+  a risk score and color-coded risk level
+- **Batch CSV Upload** — upload a CSV of multiple patients, score them all
+  via `/predict_batch`, view results in a table, and download a scored CSV
+
+The app calls the deployed Render API directly, so it doesn't need the model
+or MLflow registry to run locally — only `requests` and `streamlit`.
 
 ---
 
