@@ -76,6 +76,8 @@ opentelemetry-semantic-conventions==0.63b1
 packaging==26.2
 pandas==2.3.3
 patsy==1.0.2
+pdfminer.six==20251230
+pdfplumber==0.11.9
 pillow==12.2.0
 plotly==5.24.1
 pluggy==1.6.0
@@ -91,12 +93,15 @@ pydantic==2.13.4
 pydantic_core==2.46.4
 Pygments==2.20.0
 pyparsing==3.3.2
+pypdfium2==5.9.0
 pytest==9.0.3
 python-dateutil==2.9.0.post0
 python-dotenv==1.2.2
 pytz==2026.2
+pywin32==312
 PyYAML==6.0.3
 regex==2026.5.9
+reportlab==4.5.1
 requests==2.34.2
 rich==15.0.0
 rich-click==1.9.8
@@ -133,4 +138,3 @@ Werkzeug==3.1.8
 xgboost==3.2.0
 yarl==1.24.2
 zipp==4.1.0
-streamlit

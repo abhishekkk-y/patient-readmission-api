@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import requests
 import urllib3
+import plotly.graph_objects as go
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # ── Page setup ────────────────────────────────────────────────────────────
@@ -45,41 +46,108 @@ with tab1:
         insulin = st.selectbox("Insulin", ["No", "Steady", "Up", "Down"])
         diabetesMed = st.selectbox("On diabetes medication", ["Yes", "No"])
 
+    # Build payload (used by both prediction and PDF generation later)
+    payload = {
+        "race": race,
+        "gender": gender,
+        "age": age,
+        "time_in_hospital": time_in_hospital,
+        "num_lab_procedures": num_lab_procedures,
+        "num_medications": num_medications,
+        "number_diagnoses": number_diagnoses,
+        "number_inpatient": number_inpatient,
+        "number_emergency": number_emergency,
+        "number_outpatient": number_outpatient,
+        "insulin": insulin,
+        "diabetesMed": diabetesMed,
+    }
+
     if st.button("Predict Risk", type="primary"):
-        payload = {
-            "race": race,
-            "gender": gender,
-            "age": age,
-            "time_in_hospital": time_in_hospital,
-            "num_lab_procedures": num_lab_procedures,
-            "num_medications": num_medications,
-            "number_diagnoses": number_diagnoses,
-            "number_inpatient": number_inpatient,
-            "number_emergency": number_emergency,
-            "number_outpatient": number_outpatient,
-            "insulin": insulin,
-            "diabetesMed": diabetesMed,
-        }
 
         with st.spinner("Getting prediction... (may take ~30s if API is waking up)"):
             try:
                 response = requests.post(f"{API_URL}/predict", json=payload, timeout=90, verify=False)
                 result = response.json()
 
-                risk = result["risk_level"]
-                score = result["readmission_risk_score"]
-
-                if risk == "High":
-                    st.error(f"**Risk Level: {risk}**  (score: {score})")
-                elif risk == "Medium":
-                    st.warning(f"**Risk Level: {risk}**  (score: {score})")
-                else:
-                    st.success(f"**Risk Level: {risk}**  (score: {score})")
-
-                st.write(result["prediction"])
+                # Store in session state so it survives reruns (needed for PDF export later)
+                st.session_state["last_result"] = result
+                st.session_state["last_payload"] = payload
 
             except Exception as e:
                 st.error(f"Error calling API: {e}")
+                st.session_state["last_result"] = None
+
+    # ── Display results if we have them ─────────────────────────────────
+    if st.session_state.get("last_result"):
+        result = st.session_state["last_result"]
+        risk = result["risk_level"]
+        score = result["readmission_risk_score"]
+
+        st.markdown("---")
+        st.subheader("Prediction Result")
+
+        col_a, col_b = st.columns([1, 1])
+
+        with col_a:
+            if risk == "High":
+                st.error(f"**Risk Level: {risk}**")
+            elif risk == "Medium":
+                st.warning(f"**Risk Level: {risk}**")
+            else:
+                st.success(f"**Risk Level: {risk}**")
+
+            st.metric("Readmission Risk Score", f"{score:.1%}")
+            st.write(result["prediction"])
+
+        with col_b:
+            # Probability distribution bar chart
+            # Note: the model returns probability of readmission <30 days.
+            # We split the remainder proportionally for illustration.
+            prob_lt30 = score
+            prob_remaining = 1 - score
+
+            fig_bar = go.Figure(data=[
+                go.Bar(
+                    x=["Risk Score", "Remaining"],
+                    y=[prob_lt30, prob_remaining],
+                    marker_color=["#EF4444" if risk == "High" else "#F59E0B" if risk == "Medium" else "#10B981", "#374151"]
+                )
+            ])
+            fig_bar.update_layout(
+                title="Readmission Risk Score",
+                yaxis_title="Probability",
+                yaxis_range=[0, 1],
+                showlegend=False,
+                height=300
+            )
+            st.plotly_chart(fig_bar, use_container_width=True)
+
+        # Radar chart of key clinical attributes
+        radar_categories = [
+            "Time in Hospital", "Lab Procedures", "Medications",
+            "Diagnoses", "Inpatient Visits", "Emergency Visits", "Outpatient Visits"
+        ]
+        radar_values = [
+            payload["time_in_hospital"],
+            payload["num_lab_procedures"],
+            payload["num_medications"],
+            payload["number_diagnoses"],
+            payload["number_inpatient"],
+            payload["number_emergency"],
+            payload["number_outpatient"],
+        ]
+
+        fig_radar = go.Figure(data=go.Scatterpolar(
+            r=radar_values,
+            theta=radar_categories,
+            fill='toself'
+        ))
+        fig_radar.update_layout(
+            title="Patient Profile Overview",
+            polar=dict(radialaxis=dict(visible=True)),
+            height=400
+        )
+        st.plotly_chart(fig_radar, use_container_width=True)
 
 # ── TAB 2: Batch CSV upload ──────────────────────────────────────────────────
 
