@@ -6,6 +6,8 @@ import sqlite3
 from datetime import datetime
 import os
 from pathlib import Path
+from typing import List
+
 
 # ── Start the app ──────────────────────────────────────────────────────────────
 
@@ -196,3 +198,42 @@ def predict(patient: PatientData):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+class BatchPredictionResponse(BaseModel):
+    readmission_risk_score: float
+    risk_level: str
+    prediction: str
+
+
+@app.post("/predict_batch", response_model=List[BatchPredictionResponse])
+def predict_batch(patients: List[PatientData]):
+    """
+    Accepts a list of patients and returns a list of predictions.
+    """
+    results = []
+
+    for patient in patients:
+        features = preprocess_input(patient)
+        probability = float(model.predict_proba(features)[0][1])
+        prediction = int(probability >= 0.5)
+
+        if probability < 0.3:
+            risk_level = "Low"
+        elif probability < 0.5:
+            risk_level = "Medium"
+        else:
+            risk_level = "High"
+
+        log_to_db(patient.dict(), probability, prediction)
+
+        results.append({
+            "readmission_risk_score": round(probability, 4),
+            "risk_level": risk_level,
+            "prediction": (
+                "Likely readmission within 30 days"
+                if prediction == 1
+                else "Unlikely readmission within 30 days"
+            )
+        })
+
+    return results
