@@ -3,6 +3,4 @@ __pycache__/
 .env
 data/
 *.db
-mlruns/
-*.pkl
 venv/

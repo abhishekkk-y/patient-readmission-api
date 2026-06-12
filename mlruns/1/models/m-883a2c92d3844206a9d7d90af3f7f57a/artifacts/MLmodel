@@ -1,0 +1,23 @@
+artifact_path: file:C:/Users/m209349/patient-readmission-api/mlruns/1/models/m-883a2c92d3844206a9d7d90af3f7f57a/artifacts
+flavors:
+  python_function:
+    env:
+      conda: conda.yaml
+      virtualenv: python_env.yaml
+    loader_module: mlflow.sklearn
+    model_path: model.pkl
+    predict_fn: predict
+    python_version: 3.14.5
+  sklearn:
+    code: null
+    pickled_model: model.pkl
+    serialization_format: cloudpickle
+    sklearn_version: 1.9.0
+    skops_trusted_types: null
+mlflow_version: 3.13.0
+model_id: m-883a2c92d3844206a9d7d90af3f7f57a
+model_size_bytes: 321131
+model_uuid: m-883a2c92d3844206a9d7d90af3f7f57a
+prompts: null
+run_id: bd7aa464e618470291e66a9166899990
+utc_time_created: '2026-06-11 21:54:58.985342'
