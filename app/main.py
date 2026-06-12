@@ -4,6 +4,8 @@ import mlflow.sklearn
 import pandas as pd
 import sqlite3
 from datetime import datetime
+import os
+from pathlib import Path
 
 # ── Start the app ──────────────────────────────────────────────────────────────
 
@@ -17,8 +19,18 @@ app = FastAPI(
 # This loads the model you marked as "champion" in the registry
 # It runs once when the API starts up
 
-print("Loading model from MLflow registry...")
-model = mlflow.sklearn.load_model("models:/readmission-model@champion")
+MODEL_URI = os.getenv(
+    "READMISSION_MODEL_URI",
+    "models:/readmission-model@champion"
+)
+print(f"Loading model from {MODEL_URI}...")
+try:
+    model = mlflow.sklearn.load_model(MODEL_URI)
+except Exception as exc:
+    fallback_model_path = Path(__file__).resolve().parents[1] / "mlruns" / "1" / "models" / "m-883a2c92d3844206a9d7d90af3f7f57a" / "artifacts"
+    print(f"Registry load failed: {exc}")
+    print(f"Falling back to local model artifact at {fallback_model_path}")
+    model = mlflow.sklearn.load_model(str(fallback_model_path))
 print("Model loaded.")
 
 # ── Feature columns ────────────────────────────────────────────────────────────
